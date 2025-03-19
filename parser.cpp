@@ -6,156 +6,185 @@
 #include <cstdlib>
 using namespace std;
 
-// Define token types
-enum TokenType { INTEGER, OPERATOR, END_OF_FILE };
-
-struct Token {
-    TokenType type;
-    string lexeme;
+// Enum to categorize token types
+enum TokenCategory
+{
+    NUMERIC,
+    ARITHMETIC_OPERATOR,
+    FILE_END
 };
 
-// Global vector to hold tokens and a token index for the parser.
-vector<Token> tokens;
-int tokenIndex = 0;
-
-// Get the next token and peek at the current token.
-Token getNextToken() {
-    if (tokenIndex < tokens.size())
-        return tokens[tokenIndex++];
-    return {END_OF_FILE, ""};
-}
-
-Token peekToken() {
-    if (tokenIndex < tokens.size())
-        return tokens[tokenIndex];
-    return {END_OF_FILE, ""};
-}
-
-// Define the AST node structure.
-struct ASTNode {
-    string label;
-    ASTNode* left;
-    ASTNode* right;
-    ASTNode(string lbl) : label(lbl), left(nullptr), right(nullptr) {}
+struct LexicalToken
+{
+    TokenCategory category;
+    string value;
 };
 
-// Forward declarations for recursive descent functions.
-ASTNode* expression();
-ASTNode* expressionSuffix(ASTNode* left);
-ASTNode* term();
-ASTNode* termSuffix(ASTNode* left);
-ASTNode* factor();
+// Global list to store tokens and a pointer to track current token position.
+vector<LexicalToken> lexicalTokens;
+int currentTokenIndex = 0;
 
-// <expression> -> <term> <expression_suffix>
-ASTNode* expression() {
-    ASTNode* t = term();
-    return expressionSuffix(t);
+// Function to retrieve the next token and preview the current token.
+LexicalToken getNextToken()
+{
+    if (currentTokenIndex < lexicalTokens.size())
+        return lexicalTokens[currentTokenIndex++];
+    return {FILE_END, ""};
 }
 
-// <expression_suffix> -> + <term> <expression_suffix> | - <term> <expression_suffix> | ε
-ASTNode* expressionSuffix(ASTNode* left) {
-    Token tk = peekToken();
-    if (tk.type == OPERATOR && (tk.lexeme == "+" || tk.lexeme == "-")) {
+LexicalToken previewToken()
+{
+    if (currentTokenIndex < lexicalTokens.size())
+        return lexicalTokens[currentTokenIndex];
+    return {FILE_END, ""};
+}
+
+// Define the Abstract Syntax Tree (AST) node structure.
+struct ASTNode
+{
+    string nodeLabel;
+    ASTNode *leftChild;
+    ASTNode *rightChild;
+    ASTNode(string label) : nodeLabel(label), leftChild(nullptr), rightChild(nullptr) {}
+};
+
+// Forward declarations for the recursive parsing functions.
+ASTNode *parseExpression();
+ASTNode *parseExpressionContinuation(ASTNode *left);
+ASTNode *parseTerm();
+ASTNode *parseTermContinuation(ASTNode *left);
+ASTNode *parseFactor();
+
+// <expression> -> <term> <expression_continuation>
+ASTNode *parseExpression()
+{
+    ASTNode *firstTerm = parseTerm();
+    return parseExpressionContinuation(firstTerm);
+}
+
+// <expression_continuation> -> + <term> <expression_continuation> | - <term> <expression_continuation> | ε
+ASTNode *parseExpressionContinuation(ASTNode *left)
+{
+    LexicalToken token = previewToken();
+    if (token.category == ARITHMETIC_OPERATOR && (token.value == "+" || token.value == "-"))
+    {
         getNextToken(); // Consume the operator.
-        ASTNode* rightTerm = term();
-        // Create an operator node (either "Add" or "Subtract")
-        string opLabel = (tk.lexeme == "+") ? "Add" : "Subtract";
-        ASTNode* opNode = new ASTNode(opLabel);
-        opNode->left = left;
-        opNode->right = rightTerm;
-        // Recurse to handle left-associativity.
-        return expressionSuffix(opNode);
+        ASTNode *rightTerm = parseTerm();
+        // Create an operation node (either "Add" or "Subtract").
+        string operationLabel = (token.value == "+") ? "(Addition)" : "(Subtraction)";
+        ASTNode *operationNode = new ASTNode(operationLabel);
+        operationNode->leftChild = left;
+        operationNode->rightChild = rightTerm;
+        // Recurse to maintain left-associativity.
+        return parseExpressionContinuation(operationNode);
     }
     return left;
 }
 
-// <term> -> <factor> <term_suffix>
-ASTNode* term() {
-    ASTNode* f = factor();
-    return termSuffix(f);
+// <term> -> <factor> <term_continuation>
+ASTNode *parseTerm()
+{
+    ASTNode *factorNode = parseFactor();
+    return parseTermContinuation(factorNode);
 }
 
-// <term_suffix> -> * <factor> <term_suffix> | / <factor> <term_suffix> | ε
-ASTNode* termSuffix(ASTNode* left) {
-    Token tk = peekToken();
-    if (tk.type == OPERATOR && (tk.lexeme == "*" || tk.lexeme == "/")) {
+// <term_continuation> -> * <factor> <term_continuation> | / <factor> <term_continuation> | ε
+ASTNode *parseTermContinuation(ASTNode *left)
+{
+    LexicalToken token = previewToken();
+    if (token.category == ARITHMETIC_OPERATOR && (token.value == "*" || token.value == "/"))
+    {
         getNextToken(); // Consume the operator.
-        ASTNode* rightFactor = factor();
-        string opLabel = (tk.lexeme == "*") ? "Multiply" : "Divide";
-        ASTNode* opNode = new ASTNode(opLabel);
-        opNode->left = left;
-        opNode->right = rightFactor;
-        return termSuffix(opNode);
+        ASTNode *rightFactor = parseFactor();
+        string operationLabel = (token.value == "*") ? "(Multiplication)" : "(Division)";
+        ASTNode *operationNode = new ASTNode(operationLabel);
+        operationNode->leftChild = left;
+        operationNode->rightChild = rightFactor;
+        return parseTermContinuation(operationNode);
     }
     return left;
 }
 
 // <factor> -> ( <expression> ) | <integer>
-ASTNode* factor() {
-    Token tk = peekToken();
-    if (tk.type == OPERATOR && tk.lexeme == "(") {
-        getNextToken(); // Consume '('.
-        ASTNode* expr = expression();
-        Token next = getNextToken();
-        if (next.type != OPERATOR || next.lexeme != ")") {
-            cerr << "Syntax error: expected ')'" << endl;
+ASTNode *parseFactor()
+{
+    LexicalToken token = previewToken();
+    if (token.category == ARITHMETIC_OPERATOR && token.value == "(")
+    {
+        getNextToken(); // Consume the opening parenthesis.
+        ASTNode *expressionNode = parseExpression();
+        LexicalToken nextToken = getNextToken();
+        if (nextToken.category != ARITHMETIC_OPERATOR || nextToken.value != ")")
+        {
+            cerr << "Error: Expected closing parenthesis ')'." << endl;
             exit(1);
         }
-        return expr;
-    } else if (tk.type == INTEGER) {
-        getNextToken(); // Consume integer.
-        // Create an AST leaf node for the integer.
-        ASTNode* node = new ASTNode(tk.lexeme + " (int)");
-        return node;
-    } else {
-        cerr << "Syntax error: unexpected token '" << tk.lexeme << "'" << endl;
+        return expressionNode;
+    }
+    else if (token.category == NUMERIC)
+    {
+        getNextToken(); // Consume the integer.
+        // Create a leaf node for the integer.
+        ASTNode *numberNode = new ASTNode(token.value + " (integer)");
+        return numberNode;
+    }
+    else
+    {
+        cerr << "Error: Unexpected token '" << token.value << "'." << endl;
         exit(1);
     }
 }
 
-// A helper function to print the AST in a tree-like structure.
-void printAST(ASTNode* node, int indent = 0) {
-    if (!node) return;
+// Helper function to display the AST structure.
+void displayAST(ASTNode *node, int indent = 0)
+{
+    if (!node)
+        return;
     for (int i = 0; i < indent; i++)
         cout << "    ";
-    cout << node->label << endl;
-    printAST(node->left, indent + 1);
-    printAST(node->right, indent + 1);
+    cout << node->nodeLabel << endl;
+    displayAST(node->leftChild, indent + 1);
+    displayAST(node->rightChild, indent + 1);
 }
 
-int main() {
-    // Read the tokens generated by the lexer from tokens.txt.
-    ifstream infile("tokens.txt");
-    if (!infile) {
-        cerr << "Error opening tokens.txt" << endl;
+int main()
+{
+    // Open the token file generated by the lexer.
+    ifstream inputFile("tokens.txt");
+    if (!inputFile)
+    {
+        cerr << "Error: Unable to open 'tokens.txt'." << endl;
         return 1;
     }
     string line;
-    while(getline(infile, line)) {
-        istringstream iss(line);
-        string lexeme, tokenStr;
-        if (getline(iss, lexeme, ',') && getline(iss, tokenStr)) {
-            Token t;
-            t.lexeme = lexeme;
-            if (tokenStr == "integer")
-                t.type = INTEGER;
-            else if (tokenStr == "operator")
-                t.type = OPERATOR;
-            tokens.push_back(t);
+    while (getline(inputFile, line))
+    {
+        istringstream tokenStream(line);
+        string lexeme, tokenType;
+        if (getline(tokenStream, lexeme, ',') && getline(tokenStream, tokenType))
+        {
+            LexicalToken token;
+            token.value = lexeme;
+            if (tokenType == "integer")
+                token.category = NUMERIC;
+            else if (tokenType == "operator")
+                token.category = ARITHMETIC_OPERATOR;
+            lexicalTokens.push_back(token);
         }
     }
-    infile.close();
+    inputFile.close();
 
-    // Parse the tokens to build the AST.
-    ASTNode* ast = expression();
+    // Begin parsing the tokens to construct the AST.
+    ASTNode *astRoot = parseExpression();
 
-    // Check for extra tokens after parsing.
-    if (tokenIndex < tokens.size()){
-        cerr << "Syntax error: extra tokens remaining." << endl;
+    // Check for any additional tokens left unparsed.
+    if (currentTokenIndex < lexicalTokens.size())
+    {
+        cerr << "Error: Unexpected extra tokens remaining." << endl;
         return 1;
     }
 
-    cout << "Abstract Syntax Tree:" << endl;
-    printAST(ast);
+    cout << "Generated Abstract Syntax Tree:" << endl;
+    displayAST(astRoot);
     return 0;
 }

@@ -1,34 +1,42 @@
-%{
-#include <stdio.h>
-FILE *output;
-%}
-
-%%
-
-[0-9]+    { fprintf(output, "%s,integer\n", yytext); }
-"("       { fprintf(output, "%s,operator\n", yytext); }
-")"       { fprintf(output, "%s,operator\n", yytext); }
-"+"       { fprintf(output, "%s,operator\n", yytext); }
-"-"       { fprintf(output, "%s,operator\n", yytext); }
-"*"       { fprintf(output, "%s,operator\n", yytext); }
-"/"       { fprintf(output, "%s,operator\n", yytext); }
-[ \t\n]+  { /* Ignore whitespace */ }
-.         { printf("Unknown character: %s\n", yytext); }
-
-%%
-
-int main(int argc, char **argv)
+%
 {
-    /* Open output file to write tokens */
-    output = fopen("tokens.txt", "w");
-    if (!output) {
-        perror("fopen");
+#include <stdio.h>
+    FILE *outputFile;
+    %
+}
+
+% %
+
+        [0 - 9] +
+{
+    fprintf(outputFile, "%s,integer\n", yytext);
+}
+"(" { fprintf(outputFile, "%s,operator\n", yytext); }
+")" { fprintf(outputFile, "%s,operator\n", yytext); }
+"+" { fprintf(outputFile, "%s,operator\n", yytext); }
+"-" { fprintf(outputFile, "%s,operator\n", yytext); }
+"*" { fprintf(outputFile, "%s,operator\n", yytext); }
+"/" { fprintf(outputFile, "%s,operator\n", yytext); }
+[ \t\n] + {/* Skip over whitespace characters */}
+              . { printf("Encountered an unknown character: %s\n", yytext); }
+
+% %
+
+    int main(int argc, char **argv)
+{
+    /* Open file to output recognized tokens */
+    outputFile = fopen("tokens.txt", "w");
+    if (!outputFile)
+    {
+        perror("Failed to open file");
         return 1;
     }
     yylex();
-    fclose(output);
+    fclose(outputFile);
     return 0;
 }
-int yywrap() {
+
+int yywrap()
+{
     return 1;
 }
