@@ -1,3 +1,4 @@
+/* Team: Team 7 */
 %
 {
 #include <stdio.h>
