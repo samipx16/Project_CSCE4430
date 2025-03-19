@@ -1,3 +1,12 @@
+Team: Team 7
+
+Team Member: Samip Chalise | 
+
+Team Member: Priyash Jung Shah | 11438731
+
+Term Project 1: “Let’s build our own simple programming language”
+
+
 Arithmetic Expression Parser
 This project implements a simple arithmetic expression parser using Flex (Lexical Analyzer) and C++ (Recursive Descent Parser). The program takes mathematical expressions as input, tokenizes them, and builds an Abstract Syntax Tree (AST).
 How to Run:
